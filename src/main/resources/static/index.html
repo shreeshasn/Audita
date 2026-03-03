@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audita — GitHub Repository Auditor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00ff88;
+    --accent2: #0088ff;
+    --accent3: #ff6b35;
+    --warn: #ffcc00;
+    --text: #e8e8f0;
+    --muted: #666680;
+    --good: #00ff88;
+    --bad: #ff4466;
+    --mid: #ffcc00;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* LANDING */
+  .landing {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    background: var(--bg);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .landing.hidden {
+    opacity: 0;
+    transform: translateY(-30px);
+    pointer-events: none;
+  }
+
+  .logo {
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.1s forwards;
+  }
+
+  .landing h1 {
+    font-size: clamp(40px, 7vw, 80px);
+    font-weight: 800;
+    line-height: 1.0;
+    text-align: center;
+    margin-bottom: 16px;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.2s forwards;
+  }
+
+  .landing h1 span { color: var(--accent); }
+
+  .landing p {
+    color: var(--muted);
+    font-size: 16px;
+    margin-bottom: 48px;
+    text-align: center;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.3s forwards;
+  }
+
+  .input-row {
+    display: flex;
+    width: min(640px, 90vw);
+    opacity: 0;
+    animation: fadeUp 0.5s 0.4s forwards;
+  }
+
+  .input-row input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-right: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 16px 20px;
+    outline: none;
+    transition: border-color 0.2s;
+    border-radius: 6px 0 0 6px;
+  }
+
+  .input-row input:focus { border-color: var(--accent); }
+  .input-row input::placeholder { color: var(--muted); }
+
+  .analyze-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 16px 28px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .analyze-btn:hover { background: #00e87a; }
+  .analyze-btn:active { transform: scale(0.98); }
+  .analyze-btn:disabled { background: var(--muted); cursor: not-allowed; }
+
+  .error-msg {
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--bad);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .error-msg.visible { opacity: 1; }
+
+  /* LOADING */
+  .loading {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .loading.active { display: flex; }
+
+  .loader-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+
+  .loader-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 320px;
+  }
+
+  .loader-step {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transition: opacity 0.3s, color 0.3s;
+  }
+
+  .loader-step.active { opacity: 1; color: var(--muted); }
+  .loader-step.done { opacity: 1; color: var(--accent); }
+  .loader-step .step-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  .loader-bar-bg {
+    width: 320px;
+    height: 2px;
+    background: var(--surface2);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .loader-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* REPORT */
+  .report {
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    display: none;
+    transition: opacity 0.6s ease;
+  }
+
+  .report.visible { opacity: 1; }
+
+  .report-header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(12px);
+    z-index: 50;
+  }
+
+  .report-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .repo-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 4px;
+  }
+
+  .repo-label span { color: var(--text); }
+
+  .new-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .new-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* HERO */
+  .hero {
+    padding: 60px 40px 40px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 60px;
+    align-items: center;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .score-ring {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    flex-shrink: 0;
+  }
+
+  .score-ring svg { transform: rotate(-90deg); width: 200px; height: 200px; }
+  .score-ring .bg-ring { fill: none; stroke: var(--surface2); stroke-width: 12; }
+
+  .score-ring .fill-ring {
+    fill: none;
+    stroke-width: 12;
+    stroke-linecap: round;
+    stroke-dasharray: 534;
+    stroke-dashoffset: 534;
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1),
+                stroke 0.5s ease;
+  }
+
+  .score-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score-number {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .score-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .hero-info h2 { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
+
+  .repo-desc {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  .hero-stats { display: flex; gap: 32px; flex-wrap: wrap; }
+
+  .stat { display: flex; flex-direction: column; gap: 4px; }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stat-key {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .grade-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+
+  .grade-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  /* CATEGORIES */
+  .categories {
+    padding: 0 40px 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .category-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    transition: border-color 0.2s, transform 0.2s;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  .category-card.animate {
+    animation: cardIn 0.4s forwards;
+  }
+
+  .category-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+  .cat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .cat-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .cat-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .cat-score span { color: var(--text); font-weight: 600; }
+
+  .cat-bar-bg {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .cat-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    width: 0;
+    transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .checks { display: flex; flex-direction: column; gap: 10px; }
+
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .check-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .check-icon.pass { background: rgba(0,255,136,0.15); color: var(--good); border: 1px solid rgba(0,255,136,0.3); }
+  .check-icon.fail { background: rgba(255,68,102,0.15); color: var(--bad); border: 1px solid rgba(255,68,102,0.3); }
+  .check-icon.warn { background: rgba(255,204,0,0.15); color: var(--warn); border: 1px solid rgba(255,204,0,0.3); }
+
+  .check-text { color: var(--text); line-height: 1.4; }
+  .check-text .check-sub { color: var(--muted); font-size: 11px; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+  /* SUGGESTIONS */
+  .suggestions {
+    padding: 0 40px 60px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .suggestion-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .suggestion {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent3);
+    padding: 14px 18px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .suggestion .priority {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent3);
+    background: rgba(255,107,53,0.1);
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .no-suggestions {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    padding: 16px;
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 6px;
+    background: rgba(0,255,136,0.05);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  @media (max-width: 700px) {
+    .hero { grid-template-columns: 1fr; gap: 30px; padding: 40px 20px 20px; }
+    .categories, .suggestions { padding-left: 20px; padding-right: 20px; }
+    .report-header { padding: 16px 20px; gap: 10px; flex-wrap: wrap; }
+    .hero-stats { gap: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div class="landing" id="landing">
+  <div class="logo">⬡ Audita</div>
+  <h1>Audit any<br><span>GitHub repo</span><br>instantly.</h1>
+  <p>Enter a repository URL to get a full health report in seconds.</p>
+  <div class="input-row">
+    <input type="text" id="repoInput" placeholder="https://github.com/owner/repository" />
+    <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">Analyze →</button>
+  </div>
+  <div class="error-msg" id="errorMsg">⚠ Could not fetch repository. Check the URL and try again.</div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="loader-text">ANALYZING REPOSITORY</div>
+  <div class="loader-bar-bg"><div class="loader-bar" id="loaderBar"></div></div>
+  <div class="loader-steps">
+    <div class="loader-step" id="step1"><div class="step-dot"></div> Fetching repository metadata...</div>
+    <div class="loader-step" id="step2"><div class="step-dot"></div> Scanning file structure...</div>
+    <div class="loader-step" id="step3"><div class="step-dot"></div> Checking CI/CD workflows...</div>
+    <div class="loader-step" id="step4"><div class="step-dot"></div> Analyzing community health...</div>
+    <div class="loader-step" id="step5"><div class="step-dot"></div> Calculating score...</div>
+  </div>
+</div>
+
+<!-- REPORT -->
+<div class="report" id="report">
+  <div class="report-header">
+    <div class="report-logo">⬡ Audita</div>
+    <div class="repo-label" id="headerRepoLabel">—</div>
+    <button class="new-btn" onclick="resetApp()">← New Analysis</button>
+  </div>
+
+  <div class="hero">
+    <div class="score-ring">
+      <svg viewBox="0 0 200 200">
+        <circle class="bg-ring" cx="100" cy="100" r="85"/>
+        <circle class="fill-ring" id="fillRing" cx="100" cy="100" r="85"/>
+      </svg>
+      <div class="score-center">
+        <div class="score-number" id="scoreNum">0</div>
+        <div class="score-label">/ 100</div>
+      </div>
+    </div>
+
+    <div class="hero-info">
+      <div class="grade-badge" id="gradeBadge">
+        <div class="grade-dot" id="gradeDot"></div>
+        <span id="gradeText">—</span>
+      </div>
+      <h2 id="repoName">—</h2>
+      <p class="repo-desc" id="repoDesc">—</p>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-value" id="statStars" style="color:var(--accent)">—</div>
+          <div class="stat-key">Stars</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="statForks" style="color:var(--accent2)">—</div>
+          <div class="stat-key">Forks</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="statIssues" style="color:var(--warn)">—</div>
+          <div class="stat-key">Open Issues</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="statPushed" style="color:var(--muted)">—</div>
+          <div class="stat-key">Last Pushed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="categories" id="categoriesContainer"></div>
+
+  <div class="suggestions">
+    <div class="section-title">// Improvement Suggestions</div>
+    <div class="suggestion-list" id="suggestionsContainer"></div>
+  </div>
+</div>
+
+<script>
+  const CIRCUMFERENCE = 2 * Math.PI * 85;
+  const API_BASE = 'http://localhost:8081';
+
+  const CATEGORY_ICONS = {
+    'Documentation': '📄',
+    'CI/CD': '⚙️',
+    'Docker': '🐳',
+    'Code Quality': '🧪',
+    'Community': '🌍'
+  };
+
+  async function startAnalysis() {
+    const input = document.getElementById('repoInput').value.trim();
+    const errorMsg = document.getElementById('errorMsg');
+    const btn = document.getElementById('analyzeBtn');
+
+    errorMsg.classList.remove('visible');
+
+    if (!input || !input.includes('github.com')) {
+      errorMsg.textContent = '⚠ Please enter a valid GitHub URL.';
+      errorMsg.classList.add('visible');
+      return;
+    }
+
+    btn.disabled = true;
+    document.getElementById('landing').classList.add('hidden');
+
+    setTimeout(() => {
+      document.getElementById('loading').classList.add('active');
+      animateLoading(input);
+    }, 600);
+  }
+
+  async function animateLoading(repoUrl) {
+    const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
+    const bar = document.getElementById('loaderBar');
+    let data = null;
+    let fetchError = null;
+
+    // Start fetch immediately
+    const fetchPromise = fetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(repoUrl)}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Bad response');
+        return res.json();
+      })
+      .then(json => { data = json; })
+      .catch(err => { fetchError = err; });
+
+    // Animate steps with timing
+    for (let i = 0; i < steps.length; i++) {
+      document.getElementById(steps[i]).classList.add('active');
+      bar.style.width = ((i + 1) / steps.length * 85) + '%';
+      await sleep(600);
+      document.getElementById(steps[i]).classList.add('done');
+    }
+
+    // Wait for fetch to complete
+    await fetchPromise;
+    bar.style.width = '100%';
+    await sleep(300);
+
+    document.getElementById('loading').classList.remove('active');
+
+    if (fetchError || !data) {
+      showError();
+      return;
+    }
+
+    renderReport(data, repoUrl);
+  }
+
+  function renderReport(data, repoUrl) {
+    // Header
+    const parts = repoUrl.replace('https://github.com/', '').split('/');
+    document.getElementById('headerRepoLabel').innerHTML = `github.com / <span>${parts[0]}/${parts[1]}</span>`;
+
+    // Grade badge
+    const gradeColors = { A: '#00ff88', B: '#00cc88', C: '#ffcc00', D: '#ff4466' };
+    const gradeLabels = { A: 'Excellent', B: 'Good', C: 'Needs Work', D: 'Poor' };
+    const gradeColor = gradeColors[data.grade] || '#00ff88';
+    const gradeBadge = document.getElementById('gradeBadge');
+    gradeBadge.style.background = `rgba(${hexToRgb(gradeColor)}, 0.1)`;
+    gradeBadge.style.border = `1px solid rgba(${hexToRgb(gradeColor)}, 0.3)`;
+    gradeBadge.style.color = gradeColor;
+    document.getElementById('gradeDot').style.background = gradeColor;
+    document.getElementById('gradeText').textContent = `GRADE ${data.grade} — ${gradeLabels[data.grade]}`;
+
+    // Repo info
+    document.getElementById('repoName').textContent = data.fullName;
+    document.getElementById('repoDesc').textContent = data.description || 'No description provided.';
+    document.getElementById('statStars').textContent = formatNum(data.stars);
+    document.getElementById('statForks').textContent = formatNum(data.forks);
+    document.getElementById('statIssues').textContent = formatNum(data.openIssues);
+    document.getElementById('statPushed').textContent = timeAgo(data.lastPushed);
+
+    // Show report
+    const report = document.getElementById('report');
+    report.style.display = 'block';
+    setTimeout(() => {
+      report.classList.add('visible');
+      animateScore(data.totalScore, gradeColor);
+      renderCategories(data.categories);
+      renderSuggestions(data.suggestions);
+    }, 50);
+  }
+
+  function animateScore(score, color) {
+    const fillRing = document.getElementById('fillRing');
+    const scoreNum = document.getElementById('scoreNum');
+
+    fillRing.style.stroke = color;
+    fillRing.style.filter = `drop-shadow(0 0 8px ${color})`;
+    scoreNum.style.color = color;
+    scoreNum.style.filter = `drop-shadow(0 0 20px ${color}40)`;
+
+    const offset = CIRCUMFERENCE - (score / 100) * CIRCUMFERENCE;
+    fillRing.style.strokeDashoffset = offset;
+
+    let current = 0;
+    const interval = setInterval(() => {
+      current += 1;
+      scoreNum.textContent = current;
+      if (current >= score) clearInterval(interval);
+    }, 18);
+  }
+
+  function renderCategories(categories) {
+    const container = document.getElementById('categoriesContainer');
+    container.innerHTML = '';
+
+    categories.forEach((cat, i) => {
+      const pct = Math.round((cat.score / cat.maxScore) * 100);
+      const barColor = pct >= 80 ? 'var(--good)' : pct >= 50 ? 'var(--mid)' : 'var(--bad)';
+      const icon = CATEGORY_ICONS[cat.name] || '📋';
+
+      const checksHtml = cat.checks.map(check => `
+        <div class="check-item">
+          <div class="check-icon ${check.status}">${check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '!'}</div>
+          <div class="check-text">
+            ${check.label}
+            ${check.detail ? `<div class="check-sub">${check.detail}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      const card = document.createElement('div');
+      card.className = 'category-card';
+      card.innerHTML = `
+        <div class="cat-header">
+          <div class="cat-title"><span>${icon}</span> ${cat.name}</div>
+          <div class="cat-score"><span>${cat.score}</span> / ${cat.maxScore}</div>
+        </div>
+        <div class="cat-bar-bg">
+          <div class="cat-bar-fill" style="background:${barColor}" data-width="${pct}"></div>
+        </div>
+        <div class="checks">${checksHtml}</div>
+      `;
+
+      container.appendChild(card);
+
+      setTimeout(() => {
+        card.classList.add('animate');
+        const bar = card.querySelector('.cat-bar-fill');
+        if (bar) bar.style.width = bar.dataset.width + '%';
+      }, i * 100);
+    });
+  }
+
+  function renderSuggestions(suggestions) {
+    const container = document.getElementById('suggestionsContainer');
+    container.innerHTML = '';
+
+    if (!suggestions || suggestions.length === 0) {
+      container.innerHTML = `<div class="no-suggestions">✓ No major issues found. This repo is in great shape!</div>`;
+      return;
+    }
+
+    suggestions.forEach((s, i) => {
+      const priority = i === 0 ? 'HIGH' : 'LOW';
+      const div = document.createElement('div');
+      div.className = 'suggestion';
+      div.innerHTML = `<span class="priority">${priority}</span>${s}`;
+      container.appendChild(div);
+    });
+  }
+
+  function resetApp() {
+    const landing = document.getElementById('landing');
+    const report = document.getElementById('report');
+    const steps = document.querySelectorAll('.loader-step');
+    const bar = document.getElementById('loaderBar');
+    const btn = document.getElementById('analyzeBtn');
+
+    report.classList.remove('visible');
+
+    setTimeout(() => {
+      report.style.display = 'none';
+      steps.forEach(s => { s.className = 'loader-step'; });
+      bar.style.width = '0';
+      document.getElementById('categoriesContainer').innerHTML = '';
+      document.getElementById('suggestionsContainer').innerHTML = '';
+      document.getElementById('scoreNum').textContent = '0';
+      document.getElementById('fillRing').style.strokeDashoffset = CIRCUMFERENCE;
+      document.getElementById('repoInput').value = '';
+      document.getElementById('errorMsg').classList.remove('visible');
+      btn.disabled = false;
+      landing.classList.remove('hidden');
+    }, 400);
+  }
+
+  function showError() {
+    const landing = document.getElementById('landing');
+    const errorMsg = document.getElementById('errorMsg');
+    const btn = document.getElementById('analyzeBtn');
+
+    landing.classList.remove('hidden');
+    errorMsg.textContent = '⚠ Could not fetch repository. Check the URL or try again.';
+    errorMsg.classList.add('visible');
+    btn.disabled = false;
+  }
+
+  // Utilities
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function formatNum(n) {
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return n?.toString() || '0';
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '—';
+    const days = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+    if (days === 0) return 'today';
+    if (days === 1) return '1d ago';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days/30)}mo ago`;
+    return `${Math.floor(days/365)}y ago`;
+  }
+
+  function hexToRgb(hex) {
+    const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!r) return '0,255,136';
+    return `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}`;
+  }
+
+  // Enter key support
+  document.getElementById('repoInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startAnalysis();
+  });
+</script>
+</body>
+</html>
