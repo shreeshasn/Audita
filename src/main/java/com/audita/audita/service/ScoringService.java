@@ -33,13 +33,17 @@ public class ScoringService {
 
         categories.add(scoreDocumentation(data, suggestions));
         categories.add(scoreCICD(data, suggestions));
+        categories.add(scoreWorkflowQuality(data, suggestions));
         categories.add(scoreDocker(data, suggestions));
         categories.add(scoreCodeQuality(data, suggestions));
         categories.add(scoreCommunity(data, suggestions));
+        categories.add(scoreReleaseCadence(data, suggestions));
 
-        int total = categories.stream().mapToInt(CategoryScore::getScore).sum();
-        report.setTotalScore(total);
-        report.setGrade(calculateGrade(total));
+        int rawTotal = categories.stream().mapToInt(CategoryScore::getScore).sum();
+        int maxTotal = categories.stream().mapToInt(CategoryScore::getMaxScore).sum();
+        int normalizedScore = (int) Math.round((rawTotal / (double) maxTotal) * 100);
+        report.setTotalScore(normalizedScore);
+        report.setGrade(calculateGrade(normalizedScore));
         report.setCategories(categories);
         report.setSuggestions(suggestions);
 
@@ -257,6 +261,124 @@ public class ScoringService {
         cat.setChecks(checks);
         return cat;
     }
+
+    private CategoryScore scoreWorkflowQuality(RepoData data, List<String> suggestions) {
+    CategoryScore cat = new CategoryScore();
+    cat.setName("Workflow Quality");
+    cat.setMaxScore(20);
+    List<CheckItem> checks = new ArrayList<>();
+    int score = 0;
+
+    if (!data.isHasWorkflows() || data.getWorkflowContents().isEmpty()) {
+        checks.add(new CheckItem("No workflows to analyze", "Add GitHub Actions first", "fail", 0));
+        cat.setScore(0);
+        cat.setChecks(checks);
+        return cat;
+    }
+
+    String allContents = String.join("\n", data.getWorkflowContents());
+
+    boolean hasCaching = allContents.contains("cache") || allContents.contains("actions/cache");
+    if (hasCaching) {
+        score += 5;
+        checks.add(new CheckItem("Dependency caching configured", "Speeds up build times", "pass", 5));
+    } else {
+        checks.add(new CheckItem("No caching in workflows", "Add caching to speed up CI", "warn", 0));
+        suggestions.add("Add dependency caching in your GitHub Actions workflows to reduce build time by up to 60%.");
+    }
+
+    boolean runOnPR = allContents.contains("pull_request");
+    if (runOnPR) {
+        score += 5;
+        checks.add(new CheckItem("Workflows trigger on pull requests", "PRs are validated automatically", "pass", 5));
+    } else {
+        checks.add(new CheckItem("No PR trigger found", "Workflows should run on pull requests", "warn", 0));
+        suggestions.add("Configure your workflows to trigger on pull_request events to validate code before merging.");
+    }
+
+    boolean hasTimeout = allContents.contains("timeout-minutes");
+    if (hasTimeout) {
+        score += 5;
+        checks.add(new CheckItem("Timeout configured in workflows", "Prevents runaway jobs", "pass", 5));
+    } else {
+        checks.add(new CheckItem("No timeout-minutes set", "Jobs could run indefinitely", "warn", 0));
+        suggestions.add("Add timeout-minutes to your workflow jobs to prevent runaway CI builds.");
+    }
+
+    boolean hasPinnedVersions = allContents.matches("(?s).*uses: [a-zA-Z0-9_/-]+@[a-f0-9]{6,}.*");
+    if (hasPinnedVersions) {
+        score += 5;
+        checks.add(new CheckItem("Action versions are pinned", "Supply chain security best practice", "pass", 5));
+    } else {
+        checks.add(new CheckItem("Actions not pinned to commit SHA", "Pin versions for security", "warn", 0));
+        suggestions.add("Pin your GitHub Actions to specific commit SHAs instead of tags for better supply chain security.");
+    }
+
+    cat.setScore(score);
+    cat.setChecks(checks);
+    return cat;
+}
+
+private CategoryScore scoreReleaseCadence(RepoData data, List<String> suggestions) {
+    CategoryScore cat = new CategoryScore();
+    cat.setName("Release Cadence");
+    cat.setMaxScore(10);
+    List<CheckItem> checks = new ArrayList<>();
+    int score = 0;
+
+    if (data.getTotalReleases() == 0) {
+        checks.add(new CheckItem("No releases found", "Start tagging releases", "fail", 0));
+        suggestions.add("Create GitHub Releases to track versions and give users a clear history of changes.");
+        cat.setScore(0);
+        cat.setChecks(checks);
+        return cat;
+    }
+
+    score += 4;
+    checks.add(new CheckItem("Releases exist",
+            data.getTotalReleases() + " release(s) found", "pass", 4));
+
+    // Check how recent the latest release is
+    try {
+        long daysSinceRelease = java.time.temporal.ChronoUnit.DAYS.between(
+            java.time.Instant.parse(data.getLatestReleaseDate()),
+            java.time.Instant.now()
+        );
+
+        if (daysSinceRelease <= 90) {
+            score += 3;
+            checks.add(new CheckItem("Recent release found",
+                    "Last release " + daysSinceRelease + " days ago", "pass", 3));
+        } else {
+            checks.add(new CheckItem("Release is outdated",
+                    "Last release " + daysSinceRelease + " days ago", "warn", 0));
+            suggestions.add("Your last release was over 90 days ago. Regular releases improve user trust.");
+        }
+    } catch (Exception e) {
+        checks.add(new CheckItem("Could not determine release date", "", "warn", 0));
+    }
+
+    // Check release frequency
+    if (data.getAvgDaysBetweenReleases() > 0) {
+        double avg = data.getAvgDaysBetweenReleases();
+        if (avg <= 30) {
+            score += 3;
+            checks.add(new CheckItem("Frequent release cadence",
+                    String.format("Avg %.0f days between releases", avg), "pass", 3));
+        } else if (avg <= 90) {
+            score += 2;
+            checks.add(new CheckItem("Moderate release cadence",
+                    String.format("Avg %.0f days between releases", avg), "warn", 2));
+        } else {
+            checks.add(new CheckItem("Infrequent releases",
+                    String.format("Avg %.0f days between releases", avg), "fail", 0));
+        }
+    }
+
+    cat.setScore(score);
+    cat.setChecks(checks);
+    return cat;
+}
 
     private boolean hasFile(RepoData data, String filename) {
         if (data.getRootFiles() == null) return false;
