@@ -1,20 +1,22 @@
 /* =============================================
    AUDITA — utils.js
-   Shared constants and utility functions
-   used by both index.js and compare.js
+   Shared constants, helpers, and the global
+   apiFetch wrapper (cold-start awareness)
    ============================================= */
 
 const API_BASE = 'http://localhost:8081';
 
 const CATEGORY_ICONS = {
-  'Documentation': '📄',
-  'CI/CD': '⚙️',
-  'Docker': '🐳',
-  'Code Quality': '🧪',
-  'Community': '🌍',
-  'Workflow Quality': '🔁',
+  'Documentation':   '📄',
+  'CI/CD':           '⚙️',
+  'Docker':          '🐳',
+  'Code Quality':    '🧪',
+  'Community':       '🌍',
+  'Workflow Quality':'🔁',
   'Release Cadence': '🚀'
 };
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 function cleanGithubUrl(url) {
   const match = url.match(/https?:\/\/github\.com\/([^\/]+)\/([^\/\?#]+)/);
@@ -35,5 +37,58 @@ function formatNum(n) {
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!r) return '0,255,136';
-  return `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}`;
+  return `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}`;
+}
+
+// ── Global waking pill ────────────────────────────────────────────────────────
+// If any apiFetch call takes longer than WAKE_THRESHOLD ms, show the pill.
+// It hides automatically when the response returns.
+// Multiple simultaneous calls are reference-counted — pill stays until all done.
+
+const WAKE_THRESHOLD = 5000; // ms before showing "Waking server..."
+let _activeRequests = 0;
+let _wakeTimer = null;
+
+function _showPill(msg) {
+  const pill = document.getElementById('wakingPill');
+  const text = document.getElementById('wakingPillText');
+  if (!pill) return;
+  if (text && msg) text.textContent = msg;
+  pill.classList.add('visible');
+}
+
+function _hidePill() {
+  const pill = document.getElementById('wakingPill');
+  if (!pill) return;
+  pill.classList.remove('visible');
+}
+
+function _onRequestStart() {
+  _activeRequests++;
+  if (_activeRequests === 1) {
+    _wakeTimer = setTimeout(() => _showPill('Waking server...'), WAKE_THRESHOLD);
+  }
+}
+
+function _onRequestEnd() {
+  _activeRequests = Math.max(0, _activeRequests - 1);
+  if (_activeRequests === 0) {
+    clearTimeout(_wakeTimer);
+    _hidePill();
+  }
+}
+
+/**
+ * apiFetch — drop-in fetch() replacement for all API calls.
+ * Same signature: apiFetch(url) returns a Response promise.
+ * Automatically shows/hides the waking pill if the server is slow.
+ */
+async function apiFetch(url) {
+  _onRequestStart();
+  try {
+    const res = await fetch(url);
+    return res;
+  } finally {
+    _onRequestEnd();
+  }
 }

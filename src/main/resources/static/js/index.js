@@ -91,10 +91,41 @@ async function startAnalysis() {
 async function animateLoading(repoUrl) {
   const steps = ['step1','step2','step3','step4','step5'];
   const bar = document.getElementById('loaderBar');
+  const quoteEl = document.getElementById('loaderQuote');
+  const quotes = [
+    '"A clean repo is a kind repo."',
+    '"README first. Code second."',
+    '"Your CI is your first reviewer."',
+    '"Good docs outlive good code."',
+    '"Ship it. Then improve it."',
+    '"Commits are love letters to future you."',
+  ];
+  let quoteIdx = 0, quoteInterval = null;
+
+  // Start quote rotation after first step completes
+  function startQuotes() {
+    if (!quoteEl) return;
+    quoteEl.textContent = quotes[0];
+    quoteEl.classList.add('visible');
+    quoteInterval = setInterval(() => {
+      quoteEl.classList.remove('visible');
+      setTimeout(() => {
+        quoteIdx = (quoteIdx + 1) % quotes.length;
+        quoteEl.textContent = quotes[quoteIdx];
+        quoteEl.classList.add('visible');
+      }, 600);
+    }, 2200);
+  }
+
+  function stopQuotes() {
+    clearInterval(quoteInterval);
+    if (quoteEl) { quoteEl.classList.remove('visible'); quoteEl.textContent = ''; }
+  }
+
   let data = null, fetchError = null;
 
   // Read JSON first so we can surface the `error` field from the API
-  const fetchPromise = fetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(cleanGithubUrl(repoUrl))}`)
+  const fetchPromise = apiFetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(cleanGithubUrl(repoUrl))}`)
     .then(async res => {
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Could not fetch repository.');
@@ -108,11 +139,13 @@ async function animateLoading(repoUrl) {
     bar.style.width = ((i + 1) / steps.length * 85) + '%';
     await sleep(600);
     document.getElementById(steps[i]).classList.add('done');
+    if (i === 0) startQuotes();
   }
 
   await fetchPromise;
   bar.style.width = '100%';
   await sleep(300);
+  stopQuotes();
   document.getElementById('loading').classList.remove('active');
 
   if (fetchError || !data) { showError(fetchError?.message); return; }
@@ -395,17 +428,43 @@ function showError(msg) {
 
 document.getElementById('repoInput').addEventListener('keydown', e => { if (e.key === 'Enter') startAnalysis(); });
 
-// Auto-load shared /r/owner/repo URLs
+// Auto-load shared /r/owner/repo URLs — show holding screen instead of blank page
 (function () {
   const path = window.location.pathname;
-  if (path.startsWith('/r/')) {
-    const repo = path.replace('/r/', '');
-    if (repo.includes('/')) {
-      document.getElementById('repoInput').value = 'https://github.com/' + repo;
-      document.querySelector('.landing p').textContent = 'Loading shared report for ' + repo + '...';
-      setTimeout(startAnalysis, 800);
-    }
-  }
+  if (!path.startsWith('/r/')) return;
+  const repo = path.replace('/r/', '');
+  if (!repo.includes('/')) return;
+
+  // Show the branded holding screen immediately
+  const hold = document.getElementById('sharedHold');
+  const holdLabel = document.getElementById('sharedHoldLabel');
+  const holdBar = document.getElementById('sharedHoldBar');
+  hold.style.display = 'flex';
+  holdLabel.textContent = `Loading report for ${repo}...`;
+
+  // Animate the bar while waiting for page + server
+  let pct = 0;
+  const barTick = setInterval(() => {
+    pct = Math.min(pct + 3, 85);
+    holdBar.style.width = pct + '%';
+  }, 200);
+
+  // Pre-fill input, then start analysis
+  document.getElementById('repoInput').value = 'https://github.com/' + repo;
+
+  // Give the page a beat to render the hold screen before firing the fetch
+  setTimeout(() => {
+    startAnalysis();
+    // Once landing would appear (after analysis fires) dismiss the hold screen
+    const observer = new MutationObserver(() => {
+      if (!document.getElementById('landing').classList.contains('hidden')) return;
+      clearInterval(barTick);
+      holdBar.style.width = '100%';
+      setTimeout(() => { hold.classList.add('gone'); setTimeout(() => hold.style.display = 'none', 500); }, 200);
+      observer.disconnect();
+    });
+    observer.observe(document.getElementById('landing'), { attributes: true, attributeFilter: ['class'] });
+  }, 300);
 })();
 
 // Landing logo typewriter

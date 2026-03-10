@@ -36,12 +36,12 @@ async function startComparison() {
   try {
     // Fetch both in parallel — surface API error messages per repo
     const [data1, data2] = await Promise.all([
-      fetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(cleanGithubUrl(url1))}`).then(async r => {
+      apiFetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(cleanGithubUrl(url1))}`).then(async r => {
         const j = await r.json();
         if (!r.ok || j.error) throw new Error('Repo 1: ' + (j.error || 'Could not be fetched.'));
         return j;
       }),
-      fetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(cleanGithubUrl(url2))}`).then(async r => {
+      apiFetch(`${API_BASE}/api/analyze?repoUrl=${encodeURIComponent(cleanGithubUrl(url2))}`).then(async r => {
         const j = await r.json();
         if (!r.ok || j.error) throw new Error('Repo 2: ' + (j.error || 'Could not be fetched.'));
         return j;
