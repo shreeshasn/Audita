@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audita — Compare Repositories</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/compare.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <a class="logo" href="/">⬡ Audita</a>
+  <a class="back-btn" href="/">← Back to Audita</a>
+</div>
+
+<!-- INPUT -->
+<div class="compare-input" id="compareInput">
+  <h1>Compare <span>two repos</span><br>head to head.</h1>
+  <p>Enter two GitHub repository URLs to get a side by side health comparison.</p>
+  <div class="input-grid">
+    <div class="input-box">
+      <label>// Repository 1</label>
+      <input type="text" id="repo1Input" placeholder="https://github.com/owner/repo" />
+    </div>
+    <div class="vs-badge">VS</div>
+    <div class="input-box">
+      <label>// Repository 2</label>
+      <input type="text" id="repo2Input" placeholder="https://github.com/owner/repo" />
+    </div>
+  </div>
+  <button class="compare-btn" id="compareBtn" onclick="startComparison()">Compare Repositories →</button>
+  <div class="error-msg" id="errorMsg">⚠ Please enter two valid GitHub URLs.</div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="loader-text">COMPARING REPOSITORIES</div>
+  <div class="loader-bar-bg"><div class="loader-bar" id="loaderBar"></div></div>
+</div>
+
+<!-- RESULTS -->
+<div class="results" id="results">
+
+  <div class="winner-banner" id="winnerBanner">
+    <div class="winner-trophy">🏆</div>
+    <div class="winner-text">
+      <div id="winnerText">—</div>
+      <div class="winner-sub" id="winnerSub">—</div>
+    </div>
+  </div>
+
+  <div class="score-comparison">
+    <div class="score-card" id="card1">
+      <div class="score-ring-sm">
+        <svg viewBox="0 0 120 120">
+          <circle class="bg-ring" cx="60" cy="60" r="51"/>
+          <circle class="fill-ring" id="ring1" cx="60" cy="60" r="51"/>
+        </svg>
+        <div class="score-center-sm">
+          <div class="score-num-sm" id="scoreNum1">0</div>
+          <div class="score-lbl-sm">/ 100</div>
+        </div>
+      </div>
+      <div class="grade-pill" id="gradePill1"><div class="grade-dot-sm" id="gradeDot1"></div><span id="gradeText1">—</span></div>
+      <div class="card-repo-name" id="repoName1">—</div>
+      <div class="card-repo-desc" id="repoDesc1">—</div>
+      <div class="card-stats">
+        <div class="card-stat"><div class="card-stat-val" id="stars1" style="color:var(--accent)">—</div><div class="card-stat-key">Stars</div></div>
+        <div class="card-stat"><div class="card-stat-val" id="forks1" style="color:var(--accent2)">—</div><div class="card-stat-key">Forks</div></div>
+        <div class="card-stat"><div class="card-stat-val" id="issues1" style="color:var(--warn)">—</div><div class="card-stat-key">Issues</div></div>
+      </div>
+    </div>
+
+    <div class="vs-divider">VS</div>
+
+    <div class="score-card" id="card2">
+      <div class="score-ring-sm">
+        <svg viewBox="0 0 120 120">
+          <circle class="bg-ring" cx="60" cy="60" r="51"/>
+          <circle class="fill-ring" id="ring2" cx="60" cy="60" r="51"/>
+        </svg>
+        <div class="score-center-sm">
+          <div class="score-num-sm" id="scoreNum2">0</div>
+          <div class="score-lbl-sm">/ 100</div>
+        </div>
+      </div>
+      <div class="grade-pill" id="gradePill2"><div class="grade-dot-sm" id="gradeDot2"></div><span id="gradeText2">—</span></div>
+      <div class="card-repo-name" id="repoName2">—</div>
+      <div class="card-repo-desc" id="repoDesc2">—</div>
+      <div class="card-stats">
+        <div class="card-stat"><div class="card-stat-val" id="stars2" style="color:var(--accent)">—</div><div class="card-stat-key">Stars</div></div>
+        <div class="card-stat"><div class="card-stat-val" id="forks2" style="color:var(--accent2)">—</div><div class="card-stat-key">Forks</div></div>
+        <div class="card-stat"><div class="card-stat-val" id="issues2" style="color:var(--warn)">—</div><div class="card-stat-key">Issues</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">// Category Breakdown</div>
+  <div class="comparison-table">
+    <div class="table-header">
+      <div>Category</div>
+      <div class="col-repo" id="tableHeader1">Repo 1</div>
+      <div class="col-repo" id="tableHeader2">Repo 2</div>
+    </div>
+    <div id="categoryTable"></div>
+  </div>
+
+  <div class="section-title">// Improvement Suggestions</div>
+  <div class="suggestions-grid">
+    <div class="suggestions-col">
+      <h3 id="sugTitle1">Repo 1</h3>
+      <div id="sugList1"></div>
+    </div>
+    <div class="suggestions-col">
+      <h3 id="sugTitle2">Repo 2</h3>
+      <div id="sugList2"></div>
+    </div>
+  </div>
+
+  <button class="new-compare-btn" onclick="resetComparison()">← Compare Different Repos</button>
+
+</div>
+
+<script src="/js/utils.js"></script>
+<script src="/js/compare.js"></script>
+</body>
+</html>
