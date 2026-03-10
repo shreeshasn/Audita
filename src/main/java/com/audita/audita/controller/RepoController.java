@@ -21,11 +21,14 @@ public class RepoController {
 
     @GetMapping("/analyze")
     public RepoReport analyze(@RequestParam String repoUrl) {
-        String[] parts = repoUrl
-                .replace("https://github.com/", "")
-                .split("/");
-        String owner = parts[0];
-        String repo = parts[1];
+    String[] parts = repoUrl
+            .replace("https://github.com/", "")
+            .split("/");
+
+    String owner = parts[0];
+    String repo = parts[1];
+    // Strip any extra path like /tree/branch or /blob/main etc
+    repo = repo.split("\\?")[0]; // remove query params too
 
         RepoData data = gitHubService.fetchRepoData(owner, repo);
         return scoringService.score(data);

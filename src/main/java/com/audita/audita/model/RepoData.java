@@ -1,7 +1,8 @@
 package com.audita.audita.model;
-
+import java.util.Map;
 import lombok.Data;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class RepoData {
@@ -26,4 +27,9 @@ public class RepoData {
     private int totalReleases;
     private String latestReleaseDate;
     private double avgDaysBetweenReleases;
+
+    // Analytics
+    private Map<String, Long> languages;
+    private String readmeContent;
+    private List<String> contributors;    
 }

@@ -27,6 +27,10 @@ public class ScoringService {
         report.setLastPushed(data.getLastPushed());
         report.setLicense(data.getLicense());
         report.setTopics(data.getTopics());
+        report.setLanguages(data.getLanguages());
+        report.setReadmeContent(data.getReadmeContent());
+        report.setContributors(data.getContributors());
+        report.setRootFiles(data.getRootFiles());
 
         List<CategoryScore> categories = new ArrayList<>();
         List<String> suggestions = new ArrayList<>();

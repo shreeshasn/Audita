@@ -5,9 +5,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.lang.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GitHubService {
@@ -127,6 +129,62 @@ public class GitHubService {
         } catch (Exception e) {
             // repo may have no releases
         }
+
+        // Call 6 — languages
+try {
+    JsonNode languagesNode = webClient.get()
+            .uri("/repos/{owner}/{repo}/languages", owner, repo)
+            .retrieve()
+            .bodyToMono(JsonNode.class)
+            .block();
+
+    Map<String, Long> languages = new java.util.LinkedHashMap<>();
+    if (languagesNode != null) {
+        languagesNode.fields().forEachRemaining(entry ->
+            languages.put(entry.getKey(), entry.getValue().asLong())
+        );
+    }
+    data.setLanguages(languages);
+} catch (Exception e) { }
+
+// Call 7 — README content
+try {
+    JsonNode readmeNode = webClient.get()
+            .uri("/repos/{owner}/{repo}/readme", owner, repo)
+            .retrieve()
+            .bodyToMono(JsonNode.class)
+            .block();
+
+    if (readmeNode != null) {
+        String encoded = readmeNode.path("content").asText();
+        String decoded = new String(
+            java.util.Base64.getMimeDecoder().decode(encoded)
+        );
+        // Trim to first 3000 chars to keep response lean
+        data.setReadmeContent(decoded.length() > 3000
+            ? decoded.substring(0, 3000) + "\n..."
+            : decoded);
+    }
+} catch (Exception e) { }
+
+// Call 8 — contributors (top 5)
+try {
+    JsonNode contribNode = webClient.get()
+            .uri("/repos/{owner}/{repo}/contributors?per_page=5", owner, repo)
+            .retrieve()
+            .bodyToMono(JsonNode.class)
+            .block();
+
+    List<String> contributors = new ArrayList<>();
+    if (contribNode != null && contribNode.isArray()) {
+        contribNode.forEach(c -> contributors.add(
+            c.path("login").asText() + "|" +
+            c.path("contributions").asInt() + "|" +
+            c.path("avatar_url").asText()
+        ));
+    }
+    data.setContributors(contributors);
+} catch (Exception e) { }
 
         return data;
     }
