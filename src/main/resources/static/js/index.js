@@ -142,7 +142,20 @@ async function animateLoading(repoUrl) {
     if (i === 0) startQuotes();
   }
 
-  await fetchPromise;
+  // Steps done but server might still be waking — pulse the bar so it
+  // doesn't look frozen. Clears itself once fetchPromise resolves.
+  let barPulse = null;
+  let barPct = 85;
+  const barPulsePromise = new Promise(resolve => {
+    barPulse = setInterval(() => {
+      barPct = barPct >= 93 ? 85 : barPct + 1;
+      bar.style.width = barPct + '%';
+    }, 400);
+    fetchPromise.then(resolve).catch(resolve);
+  });
+  await barPulsePromise;
+  clearInterval(barPulse);
+
   bar.style.width = '100%';
   await sleep(300);
   stopQuotes();

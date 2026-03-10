@@ -1,4 +1,0 @@
-server.port=8081    
-spring.application.name=Audita
-github.token=YOUR_GITHUB_PAT_HERE
-github.base-url=https://api.github.com

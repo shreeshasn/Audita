@@ -19,9 +19,10 @@ USER audita
 
 COPY --from=build /app/target/*.jar app.jar
 
-# JVM flags tuned for 512MB (Render free tier)
+# JVM flags tuned for Render free tier (512MB)
 ENV JAVA_OPTS="-Xmx380m -Xms128m -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=96m"
 
+# Render injects PORT — Spring picks it up via ${PORT:8081} in application.properties
 EXPOSE 8080
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

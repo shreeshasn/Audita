@@ -1,0 +1,13 @@
+# Copy this to application.properties and fill in your values
+# NEVER commit application.properties — it is gitignored
+
+# GitHub personal access token (classic, public_repo scope)
+# On Render: set as GITHUB_TOKEN environment variable
+github.token=${GITHUB_TOKEN}
+
+# GitHub API base URL — fallback means this env var is optional
+# On Render: no need to set this separately, fallback handles it
+github.base-url=${GITHUB_BASE_URL:https://api.github.com}
+
+# Port — Render injects PORT automatically, falls back to 8081 locally
+server.port=${PORT:8081}

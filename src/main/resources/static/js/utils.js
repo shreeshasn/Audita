@@ -4,7 +4,10 @@
    apiFetch wrapper (cold-start awareness)
    ============================================= */
 
-const API_BASE = 'http://localhost:8081';
+// Locally Spring runs on 8081, on Render everything is same-origin
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:8081'
+  : '';
 
 const CATEGORY_ICONS = {
   'Documentation':   '📄',
@@ -48,6 +51,7 @@ function hexToRgb(hex) {
 const WAKE_THRESHOLD = 5000; // ms before showing "Waking server..."
 let _activeRequests = 0;
 let _wakeTimer = null;
+let _wakeEscalateTimer = null;
 
 function _showPill(msg) {
   const pill = document.getElementById('wakingPill');
@@ -66,7 +70,13 @@ function _hidePill() {
 function _onRequestStart() {
   _activeRequests++;
   if (_activeRequests === 1) {
-    _wakeTimer = setTimeout(() => _showPill('Waking server...'), WAKE_THRESHOLD);
+    // After 5s: first message
+    _wakeTimer = setTimeout(() => {
+      _showPill('Waking server...');
+      // After another 15s (20s total): escalate
+      _wakeEscalateTimer = setTimeout(() =>
+        _showPill('Still starting up — first load can take ~50s'), 15000);
+    }, WAKE_THRESHOLD);
   }
 }
 
@@ -74,6 +84,7 @@ function _onRequestEnd() {
   _activeRequests = Math.max(0, _activeRequests - 1);
   if (_activeRequests === 0) {
     clearTimeout(_wakeTimer);
+    clearTimeout(_wakeEscalateTimer);
     _hidePill();
   }
 }
