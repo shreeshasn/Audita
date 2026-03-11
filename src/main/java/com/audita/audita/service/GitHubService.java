@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +25,9 @@ public class GitHubService {
                 .defaultHeader("Accept", "application/vnd.github+json")
                 .build();
     }
-
-    public RepoData fetchRepoData(String owner, String repo) {
+    
+        @Cacheable(value = "reports", key = "#owner + '/' + #repo")
+        public RepoData fetchRepoData(String owner, String repo) {
         RepoData data = new RepoData();
 
         // ── Call 1 — basic repo info (FATAL if this fails) ──────────────────
