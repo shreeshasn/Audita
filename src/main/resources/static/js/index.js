@@ -169,6 +169,9 @@ async function animateLoading(repoUrl) {
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function renderReport(data, repoUrl) {
+  // Dismiss shared-link hold screen if it's showing
+  if (window._dismissSharedHold) window._dismissSharedHold();
+
   const parts = repoUrl.replace('https://github.com/', '').split('/');
   document.getElementById('headerRepoLabel').innerHTML = `github.com / <span>${parts[0]}/${parts[1]}</span>`;
   document.getElementById('githubLink').href = `https://github.com/${parts[0]}/${parts[1]}`;
@@ -431,6 +434,7 @@ function resetApp() {
 }
 
 function showError(msg) {
+  if (window._dismissSharedHold) window._dismissSharedHold();
   document.getElementById('landing').classList.remove('hidden');
   document.getElementById('errorMsg').textContent = '⚠ ' + (msg || 'Could not fetch repository. Check the URL or try again.');
   document.getElementById('errorMsg').classList.add('visible');
@@ -453,31 +457,29 @@ document.getElementById('repoInput').addEventListener('keydown', e => { if (e.ke
   const holdLabel = document.getElementById('sharedHoldLabel');
   const holdBar = document.getElementById('sharedHoldBar');
   hold.style.display = 'flex';
-  holdLabel.textContent = `Loading report for ${repo}...`;
+  holdLabel.textContent = `Running live analysis for ${repo}...`;
 
-  // Animate the bar while waiting for page + server
+  // Animate the bar while waiting
   let pct = 0;
   const barTick = setInterval(() => {
     pct = Math.min(pct + 3, 85);
     holdBar.style.width = pct + '%';
   }, 200);
 
+  // Store cleanup fn so renderReport can call it
+  window._dismissSharedHold = () => {
+    clearInterval(barTick);
+    holdBar.style.width = '100%';
+    setTimeout(() => {
+      hold.classList.add('gone');
+      setTimeout(() => { hold.style.display = 'none'; }, 500);
+    }, 200);
+    window._dismissSharedHold = null;
+  };
+
   // Pre-fill input, then start analysis
   document.getElementById('repoInput').value = 'https://github.com/' + repo;
-
-  // Give the page a beat to render the hold screen before firing the fetch
-  setTimeout(() => {
-    startAnalysis();
-    // Once landing would appear (after analysis fires) dismiss the hold screen
-    const observer = new MutationObserver(() => {
-      if (!document.getElementById('landing').classList.contains('hidden')) return;
-      clearInterval(barTick);
-      holdBar.style.width = '100%';
-      setTimeout(() => { hold.classList.add('gone'); setTimeout(() => hold.style.display = 'none', 500); }, 200);
-      observer.disconnect();
-    });
-    observer.observe(document.getElementById('landing'), { attributes: true, attributeFilter: ['class'] });
-  }, 300);
+  setTimeout(() => startAnalysis(), 300);
 })();
 
 // Landing logo typewriter
