@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=00ff88&height=120&section=header&text=⬡ AUDITA&fontSize=52&fontColor=ffffff&fontAlignY=65&animation=fadeIn" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=00ff88&height=120&section=header&text=AUDITA&fontSize=52&fontColor=ffffff&fontAlignY=65&animation=fadeIn" width="100%"/>
 
 <br/>
 
